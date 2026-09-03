@@ -163,7 +163,7 @@ setupVirtualJoystick(
   document.getElementById('look-zone'),
   null,
   null,
-  (dx) => { lookDelta = dx * 0.05; },
+  (dx) => { lookDelta =-dx * 0.05; },
   () => { lookDelta = 0; }
 );
 
