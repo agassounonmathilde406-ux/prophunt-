@@ -83,13 +83,12 @@ let myId = null;
 let localMesh = null;
 const others = {};
 
-let cameraYaw = 0;
 const CAMERA_DISTANCE = 6;
 const CAMERA_HEIGHT = 3;
 
 function updateCamera() {
-  const camX = localState.x - Math.sin(cameraYaw) * CAMERA_DISTANCE;
-  const camZ = localState.z - Math.cos(cameraYaw) * CAMERA_DISTANCE;
+  const camX = localState.x - Math.sin(localState.rotY) * CAMERA_DISTANCE;
+  const camZ = localState.z - Math.cos(localState.rotY) * CAMERA_DISTANCE;
   camera.position.set(camX, localState.y + CAMERA_HEIGHT, camZ);
   camera.lookAt(localState.x, localState.y + 1.3, localState.z);
 }
@@ -158,15 +157,6 @@ setupVirtualJoystick(
   () => { moveVec = { x: 0, y: 0 }; }
 );
 
-let lookDelta = 0;
-setupVirtualJoystick(
-  document.getElementById('look-zone'),
-  null,
-  null,
-  (dx) => { lookDelta =-dx * 0.05; },
-  () => { lookDelta = 0; }
-);
-
 const socket = io();
 
 socket.on('connect', () => { statusEl.textContent = 'Connecté'; });
@@ -215,6 +205,7 @@ setInterval(() => {
 }, 66);
 
 const MOVE_SPEED = 4;
+const TURN_SPEED = 2.4;
 let lastTime = performance.now();
 
 function animate() {
@@ -223,16 +214,11 @@ function animate() {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
-  cameraYaw += lookDelta;
-
   if (moveVec.x !== 0 || moveVec.y !== 0) {
-    const forward = -moveVec.y;
-    const strafe = moveVec.x;
-    const dirX = Math.sin(cameraYaw) * forward + Math.cos(cameraYaw) * strafe;
-    const dirZ = Math.cos(cameraYaw) * forward - Math.sin(cameraYaw) * strafe;
-    localState.x += dirX * MOVE_SPEED * dt;
-    localState.z += dirZ * MOVE_SPEED * dt;
-    localState.rotY = Math.atan2(dirX, dirZ);
+    localState.rotY += moveVec.x * TURN_SPEED * dt;
+    const forwardAmount = -moveVec.y;
+    localState.x += Math.sin(localState.rotY) * forwardAmount * MOVE_SPEED * dt;
+    localState.z += Math.cos(localState.rotY) * forwardAmount * MOVE_SPEED * dt;
   }
 
   Object.values(others).forEach((o) => {
