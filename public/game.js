@@ -1,4 +1,4 @@
-// game.js — Prop Hunt : Contrôles, Animation de marche & Transformation (Étape 2)
+// game.js — Client Prop Hunt 3D avec animation de marche & transformation
 
 const statusEl = document.getElementById('status');
 const transformBtn = document.getElementById('transform-btn');
@@ -8,9 +8,9 @@ if (window.Telegram && window.Telegram.WebApp) {
   window.Telegram.WebApp.expand();
 }
 
+// --- RENDERER & SCÈNE ---
 const canvas = document.getElementById('game-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const scene = new THREE.Scene();
@@ -19,17 +19,23 @@ scene.fog = new THREE.Fog(0x87ceeb, 20, 80);
 
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+function resizeCanvas() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  renderer.setSize(width, height);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
+// --- LUMIÈRES ---
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(10, 20, 10);
 scene.add(sun);
 
+// --- SOL ---
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(200, 200),
   new THREE.MeshStandardMaterial({ color: 0x4caf50 })
@@ -38,7 +44,7 @@ ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 scene.add(new THREE.GridHelper(200, 100, 0x2e7d32, 0x2e7d32));
 
-// --- DÉCOR & PROPS TRANSFORMABLES ---
+// --- DÉCOR & PROPS ---
 const propsList = [];
 
 function addDecorBox(x, z, size, color) {
@@ -57,12 +63,12 @@ addDecorBox(-6, 3, 1.5, 0xffb74d);
 addDecorBox(3, -7, 2.5, 0x90a4ae);
 addDecorBox(-4, -4, 1, 0xef5350);
 
-// --- CREATION MESH JOUEUR / PROP ---
+// --- CRÉATION DE MESH (HUMANOÏDE OU PROP) ---
 function createPlayerGroup(color, propData) {
   const group = new THREE.Group();
 
   if (propData) {
-    // Apparence Objet (Prop)
+    // Mode Objet (Prop)
     const propMesh = new THREE.Mesh(
       new THREE.BoxGeometry(propData.size, propData.size, propData.size),
       new THREE.MeshStandardMaterial({ color: propData.color })
@@ -70,11 +76,11 @@ function createPlayerGroup(color, propData) {
     propMesh.position.y = propData.size / 2;
     group.add(propMesh);
   } else {
-    // Apparence Personnage Humanoïde
+    // Mode Humanoïde avec pivots ajustés pour la marche
     const bodyMat = new THREE.MeshStandardMaterial({ color });
     const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
 
-    // Jambes (pivot décalé en haut pour l'articulation de la hanche)
+    // Jambes (pivot au sommet de la jambe)
     const legGeo = new THREE.BoxGeometry(0.28, 0.8, 0.28);
     legGeo.translate(0, -0.4, 0);
 
@@ -89,7 +95,7 @@ function createPlayerGroup(color, propData) {
     torso.position.y = 1.2;
     group.add(torso);
 
-    // Bras (pivot décalé au niveau de l'épaule)
+    // Bras (pivot à l'épaule)
     const armGeo = new THREE.BoxGeometry(0.25, 0.8, 0.25);
     armGeo.translate(0, -0.4, 0);
 
@@ -104,14 +110,14 @@ function createPlayerGroup(color, propData) {
     head.position.y = 1.85;
     group.add(head);
 
-    // Sauvegarde des références pour l'animation
+    // Stockage des membres pour l'animation
     group.userData = { legL, legR, armL, armR, walkTime: 0 };
   }
 
   return group;
 }
 
-// --- ÉTAT DU JOUEUR ---
+// --- ÉTAT DU JOUEUR LOCAL ---
 const localState = { x: 0, y: 0, z: 0, rotY: 0, propData: null, color: 0xffffff };
 let myId = null;
 let localMesh = null;
@@ -128,7 +134,7 @@ function updateCamera() {
   camera.lookAt(localState.x, localState.y + 1.3, localState.z);
 }
 
-// --- JOYSTICK GAUCHE ---
+// --- JOYSTICK VIRTUEL ---
 function setupVirtualJoystick(zoneEl, baseEl, stickEl, onMove, onEnd) {
   let active = false;
   let touchId = null;
@@ -136,7 +142,7 @@ function setupVirtualJoystick(zoneEl, baseEl, stickEl, onMove, onEnd) {
 
   const baseRadius = 50;
   const stickRadius = 23;
-  const maxDistance = baseRadius - stickRadius; // 27px max pour rester dans le socle
+  const maxDistance = baseRadius - stickRadius;
 
   zoneEl.addEventListener('touchstart', (e) => {
     const t = e.changedTouches[0];
@@ -204,7 +210,7 @@ setupVirtualJoystick(
   () => { moveVec = { x: 0, y: 0 }; }
 );
 
-// --- CAMÉRA DROITE ---
+// --- ROTATION DE LA CAMÉRA ---
 const lookZone = document.getElementById('look-zone');
 let lastTouchX = 0;
 let lookTouchId = null;
@@ -232,22 +238,25 @@ function endLook(e) {
 lookZone.addEventListener('touchend', endLook, { passive: true });
 lookZone.addEventListener('touchcancel', endLook, { passive: true });
 
-// --- CIBLAGE ET TRANSFORMATION ---
+// --- RAYCASTING & TRANSFORMATION ---
 const raycaster = new THREE.Raycaster();
 let targetedProp = null;
 
 function checkTargetProp() {
-  if (localState.propData) return; // Déjà transformé
+  if (localState.propData) {
+    if (transformBtn) transformBtn.style.display = 'none';
+    return;
+  }
 
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
   const intersects = raycaster.intersectObjects(propsList);
 
   if (intersects.length > 0 && intersects[0].distance < 8) {
     targetedProp = intersects[0].object.userData;
-    transformBtn.style.display = 'block';
+    if (transformBtn) transformBtn.style.display = 'block';
   } else {
     targetedProp = null;
-    transformBtn.style.display = 'none';
+    if (transformBtn) transformBtn.style.display = 'none';
   }
 }
 
@@ -288,11 +297,16 @@ function animateWalking(mesh, isMoving, dt) {
   }
 }
 
-// --- RESEAU ---
+// --- COMMUNICATION RESEAU ---
 const socket = io();
 
-socket.on('connect', () => { statusEl.textContent = 'Connecté'; });
-socket.on('disconnect', () => { statusEl.textContent = 'Déconnecté — reconnexion…'; });
+socket.on('connect', () => { 
+  statusEl.textContent = 'Connecté'; 
+});
+
+socket.on('disconnect', () => { 
+  statusEl.textContent = 'Déconnecté — reconnexion…'; 
+});
 
 socket.on('init', (data) => {
   myId = data.id;
@@ -313,7 +327,9 @@ socket.on('init', (data) => {
   statusEl.textContent = `Connecté — ${Object.keys(data.players).length} joueur(s)`;
 });
 
-socket.on('player_joined', (p) => { addOtherPlayer(p); });
+socket.on('player_joined', (p) => { 
+  addOtherPlayer(p); 
+});
 
 socket.on('player_transformed', (data) => {
   if (data.id === myId) return;
@@ -367,6 +383,10 @@ let lastTime = performance.now();
 
 function animate() {
   requestAnimationFrame(animate);
+
+  // Sécurité pour éviter tout plantage avant l'initialisation du joueur
+  if (!myId || !localMesh) return;
+
   const now = performance.now();
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
@@ -385,11 +405,9 @@ function animate() {
     localState.rotY = Math.atan2(dirX, dirZ);
   }
 
-  if (localMesh) {
-    localMesh.position.set(localState.x, localState.y, localState.z);
-    localMesh.rotation.y = localState.rotY;
-    animateWalking(localMesh, isMoving, dt);
-  }
+  localMesh.position.set(localState.x, localState.y, localState.z);
+  localMesh.rotation.y = localState.rotY;
+  animateWalking(localMesh, isMoving, dt);
 
   Object.values(others).forEach((o) => {
     const dist = Math.hypot(o.target.x - o.mesh.position.x, o.target.z - o.mesh.position.z);
