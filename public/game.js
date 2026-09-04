@@ -255,8 +255,8 @@ function animate() {
   lastTime = now;
 
   if (moveVec.x !== 0 || moveVec.y !== 0) {
-    const forward = -moveVec.y;
-    const strafe = moveVec.x;
+    const forward = -moveVec.y; // Haut/Bas inchangé (fonctionne déjà)
+    const strafe = -moveVec.x;  // Inversé (- au lieu de +) pour corriger Droite/Gauche
 
     const dirX = Math.sin(cameraYaw) * forward + Math.cos(cameraYaw) * strafe;
     const dirZ = Math.cos(cameraYaw) * forward - Math.sin(cameraYaw) * strafe;
