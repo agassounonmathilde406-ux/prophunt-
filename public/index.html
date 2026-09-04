@@ -9,9 +9,11 @@
   html, body { margin: 0; padding: 0; overflow: hidden; background: #111; height: 100%; touch-action: none; }
   #game-canvas { display: block; width: 100vw; height: 100vh; }
 
-  #joystick-zone {
-    position: fixed; bottom: 0; left: 0; width: 100vw; height: 45vh; z-index: 10;
+  #joystick-zone, #look-zone {
+    position: fixed; bottom: 0; width: 50vw; height: 45vh; z-index: 10;
   }
+  #joystick-zone { left: 0; }
+  #look-zone { right: 0; }
 
   #joystick-base {
     position: fixed; width: 100px; height: 100px; border-radius: 50%;
@@ -34,12 +36,13 @@
 <body>
   <canvas id="game-canvas"></canvas>
   <div id="joystick-zone"></div>
+  <div id="look-zone"></div>
   <div id="joystick-base"></div>
   <div id="joystick-stick"></div>
   <div id="status">Connexion…</div>
 
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/game.js"></script>
+  <script src="/game.js?v=2"></script>
 </body>
 </html>
